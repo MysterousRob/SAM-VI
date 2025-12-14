@@ -5,6 +5,11 @@
     "themes": {
         "dark": "assets/pets/Clippy/themes/Dark",
         "light": "assets/pets/Clippy/themes/Light"
+    },
+
+    "ai_config": {
+        "enabled": false,
+        "backend": "openai"
     }
 }
 

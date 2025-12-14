@@ -1,17 +1,29 @@
 import asyncio
-import edge_tts
+import time
+from edge_tts.exceptions import NoAudioReceived
 import pygame
 import os
 import uuid
 import threading
+import tempfile
 import shutil
 import atexit
 import random
 import json
-#import ai_core.brain import LocalBrain
+
+
+
+try:
+    from ai_core.brain import OpenAIBrain, LocalBrain, AIBrain
+except ImportError:
+    class AIBrain:
+        def ask(self, prompt, context): 
+            return "Sorry, i wasn't loaded correctly (ImportError)."
+    OpenAIBrain = AIBrain
+    LocalBrain = AIBrain
+    print("Error: ai_core/brain.py AI wasnt found.\nCurrently using placeholders")    
+
 from config_manager import save_last_pet, load_last_pet
-
-
 # ===========================================
 # 🗂️ TEMP FOLDER SETUP
 # ===========================================
@@ -52,23 +64,58 @@ def cleanup_temp_audio():
 
 def _run_speak_async_in_thread(speak_async_func, text): 
     """Safely runs the async speak function in a new event loop."""
-    
     try:
         asyncio.run(speak_async_func(text))
     except Exception as e:
         print(f"Speech thread error: {e}")
-# ===========================================
+        
+        
+# ===============================
+#    AI Brain Initialization
+# ===============================        
+def get_ai_brain(config_path):
+    """Initiates the AI brain based on Config"""
+    try: 
+        with open(config_path, "r") as f:
+            full_config = json.load(f)
+            ai_config = full_config.get("ai_config", {"enabled": False})
+    except Exception: 
+        ai_config = {"enabled": False}
+    
+    if not ai_config.get("enabled", False):
+        print(" AI disabeled in Config.json")
+        return None
+    
+    backend = ai_config.get("backend", "local").lower()
+    
+    try: 
+        if backend == "openai":
+            return OpenAIBrain()
+        elif backend == "local":
+            return LocalBrain()
+        else:
+            print(f"Unknown AI backend '{backend}'. Using LocalBrain placeholder")
+            return LocalBrain()
+    except Exception as e:
+        print(f"Failed to int AI Brain({backend}): {e}")
+        
+    
+# ======================
 #   PERSONALITY CLASS
-# ===========================================
+# ======================
 class Personality:
-    def __init__(self, path):
-        self.path = path
-        self.data = self.load_personality()
+    def __init__(self, personality_path: str, config_path: str):
+        self.personality_path = personality_path 
+        self.data = self._load_data(personality_path)
         
         # pick a deep voice from available ones (change it later)
         self.voice = "en-US-GuyNeural" 
         self.rate = "-20%"              
         self.volume = "+0%"
+        self.name = self.data.get("name", "Pet")
+        
+        self.brain: AIBrain | None = get_ai_brain(config_path)
+        self._last_voice_file = None
         
         #Initialize pygame mixer once
         if not pygame.mixer.get_init():
@@ -76,26 +123,22 @@ class Personality:
             
         #Store it 
         self._last_voice_file = None
-        
-        #Main brain
-        #self.brain = LocalBrain("llama3")
 
 
 
-    # ===========================================
+    # =========================
     #   LOAD PERSONALITY DATA
-    # ===========================================
-    def load_personality(self):
-        if not os.path.exists(self.path):
-            print("⚠️ Personality file missing:", self.path)
+    # =========================
+    def _load_data(self, path: str): 
+        if not os.path.exists(path):
+            print("⚠️ Personality file missing:", path)
             return {"name": "Unknown", "idle_messages": [], "mood_reactions": {}}
-        with open(self.path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-
-
-    # ===========================================
+    
+    # ===============
     #   TTS system
-    # ===========================================
+    # ===============
     async def speak_async(self, text):
         """Generate speech to a unique file, then play it safely."""
         # use unique file each time to avoid permission issues
@@ -120,6 +163,49 @@ class Personality:
             
         self._last_voice_file = out_path
 
+
+    # ========================
+    #   async speach wrapper
+    # ========================
+    def _run_speech_sync(self, msg):
+        """Blocking call to sep to gene tts"""
+        MAX_RETRIES = 3
+        RETRY_DELAY = 2
+        
+        for attempt in range(MAX_RETRIES):
+            try: 
+                asyncio.run(self.speak_async(msg))
+                return
+            except NoAudioReceived as e:
+                print(f"[TTS ERROR] no audio detected. Try {attempt + 1}/{MAX_RETRIES}. ERROR: {e}")
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                else:
+                    print("[TTS FATAL]: Tough Luck. Skipping the message.")
+                    break
+            except Exception as e:
+                print(f"[TTS UNKNOWN ERROR]: Connection ERROR, TTS wont work (WOMP WOMP): {e}")
+                break
+    
+    def _start_ai_and_speach_thread(self, prompt: str, context: dict, fallback_text: str):
+        """Runs AI and call the TTS in sep thread to avoid freezing the main loop"""
+        def worker():
+            msg_to_speak = ""
+            if self.brain:
+                try:
+                    ai_msg = self.brain.ask(prompt, context)
+                    print(f"AI Response: {self.name}: {ai_msg}")
+                    msg_to_speak = ai_msg
+                except Exception as e:
+                    print(f"AI Worker failed: {e}. Falling back to static text.")
+                    msg_to_speak = fallback_text
+            else:
+                msg_to_speak = fallback_text
+            
+            self._run_speech_sync(msg_to_speak)
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+    
     # ===========================================
     #   MOOD & IDLE SPEECH
     # ===========================================
@@ -127,38 +213,22 @@ class Personality:
         if not self.data["idle_messages"]:
             return
             
-        if pygame.mixer.music.get_busy():
-            return
-            
-        msg = random.choice(self.data["idle_messages"])
+        fallback_text = random.choice(self.data["idle_messages"])
         
-        if not msg or len(msg.strip()) < 3:
-            print(f"⚠️ Skipping idle speech: Message is too short/empty: '{msg}'")
-            return
-            
-        print(f"{self.data['name']}: {msg}")
-        threading.Thread(
-            target=_run_speak_async_in_thread,
-            args=(self.speak_async, msg)
-        ).start()
+        prompt = "Say somthing funny, positive, or relevant to system monitoring."
+        context = {"mood" : "idle", "pet_name": self.name}
+        
+        self._start_ai_and_speach_thread(prompt, context, fallback_text)
 
     def say_for_mood(self, mood):
-        text = self.data["mood_reactions"].get(mood)
-        
-        if pygame.mixer.music.get_busy():
-            return
-        
-        if text and isinstance(text, str):
-            # Add safety check against empty/single-character text
-            if len(text.strip()) < 3:
-                print(f"⚠️ Skipping mood speech ({mood}): Message is too short/empty: '{text}'")
-                return
-                
-            print(f"{self.data['name']} ({mood}): {text}")
+        text_from_json = self.data["mood_reactions"].get(mood)
+        if not text_from_json:
+            text_from_json = f"The system is {mood}. I have no special reactions."
 
-            threading.Thread(
-                target=_run_speak_async_in_thread,
-                args=(self.speak_async, text)
-            ).start()
-        else:
-            print(f"{self.data['name']} ({mood}): No valid reaction message found for mood '{mood}'.")
+        fallback_text = text_from_json
+        
+        prompt = f"React to the system baing in a '{mood}' state. Keep it brief and in character"
+        context = {"mood" : mood, "per_name" : self.name}
+        
+        self._start_ai_and_speach_thread(prompt, context, fallback_text)
+        

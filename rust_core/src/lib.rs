@@ -16,7 +16,16 @@ impl CPU {
         CPU { system: sys }
     }
 
-    fn execute(&mut self, _op: &str, _r1: usize, _r2: usize) {
+    fn execute(&mut self, opcode: &str, r1: usize, r2: usize) {
+        match opcode {
+            "ADD" => self.registers[r1] += self.registers[r2],
+            "SUB" => self.registers[r1] -= self.registers[r2],
+            "MUL" => self.registers[r1] *= self.registers[r2],
+            "DIV" => if self.registers[r2] != 0 { self.registers[r1] /= self.registers[r2]; },
+            _ => println!("Unknown instruction: {}", opcode),
+        }
+        self.pc += 1;
+
         self.system.refresh_all();
     }
 

@@ -1,45 +1,23 @@
 import os 
 import pygame
-#import openai 
 import json
 import time
+import psutil
+
 from control_menu import ControlMenu
 from overlay_utils import make_window_overlay
 from pet import Pet
 from rust_core import CPU
-import psutil
-
-#openai.api_key = os.environ.get("OPENAI_API_KEY")
-#
-#if not openai.api_key:
-#    print("Error: OpenAI API key not set.  Please set the OPENAI_API_KEY environment variable.")
-#    exit()
-#
-#try: 
-#    response = openai.completions.create(
-#        model="gpt-3.5-turbo",
-#        prompt="",
-#        max_tokens=150,
-#        stop=None
-#    )
-#    for chunk in response:
-#        if chunk.choices[0].delta['text']:
-#            print(chunk.choices[0].delta['text'], end="", flush=True)
-#        else:
-#            break
-#        
-#except openai.OpenAIError as e:
-#    print(f"OpenAI API error: {e}")
+from prompt_menu import PromptMenu
 
 
 pygame.init()
 pygame.mixer.init()
 
-# --- CONFIG ---
 CONFIG_PATH = "config.json"
 def load_config():
     if not os.path.exists(CONFIG_PATH):
-        return {"currnet_theme": "Dark"}
+        return {"current_theme": "dark", "ai_config": {"enabled": False}}
     with open(CONFIG_PATH, "r") as f:
         return json.load(f)
 
@@ -63,11 +41,16 @@ sim_cpu = CPU()
 menu = None
 menu_open = False
 
+prompt_menu = None 
+prompt_menu_open = False 
+
+
 def open_control_menu():
     global menu, menu_open
     if not menu_open:
-        print("Controll menu open")
-        x, y = pet.rect.x + 80, pet.rect.y + 50
+        print("Control menu open")
+        x = pet.rect.x + pet.rect.width + 20
+        y = pet.rect.y
         menu = ControlMenu(x, y, pet, config)
         menu_open = True
         
@@ -75,10 +58,28 @@ def close_control_menu():
     global menu, menu_open
     if menu_open:
         print("Control menu Closed")
+        if menu:
+            menu.close()
         menu = None
         menu_open = False
-            
-            
+        
+def open_prompt_menu():
+    global prompt_menu, prompt_menu_open
+    if not prompt_menu_open:
+        x = pet.rect.x + (pet.rect.width // 2) - 200 
+        y = pet.rect.y - 180 
+        prompt_menu = PromptMenu(x, y)
+        prompt_menu_open = True
+        
+def close_prompt_menu():
+    global prompt_menu, prompt_menu_open
+    if prompt_menu_open: 
+        print("Prompt Menu Closed")
+        if prompt_menu:
+            prompt_menu.close()
+        prompt_menu = None 
+        prompt_menu_open = False
+        
 def get_system_metrics():
     metrics = {
         "cpu_percent": psutil.cpu_percent(interval=0.1),
@@ -93,15 +94,45 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+            
+        if prompt_menu_open and prompt_menu:
+            result = prompt_menu.handle_event(event)
+            
+            if result:
+                if result.get("action") == "send":
+                    user_prompt = result['prompt']
+                    pet.personality.ask_ai(user_prompt)
+                    close_prompt_menu()
+                elif result.get("action") == "close":
+                    close_prompt_menu() 
+            continue
+        
         elif event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            
             if event.button == 3:
                 print("Right click detected")
-                open_control_menu()
-            elif event.button == 1 and menu_open:
-                print("Left click detected")
-                mx, my = pygame.mouse.get_pos()
+                if menu_open:
+                    print("Control Menu Closed")
+                    close_control_menu()
+                else:
+                    print("Control Menu Open")
+                    open_control_menu()
                 
-                if not menu.rect.collidepoint(mx, my):
+            elif event.button == 1:
+                print("Left click detected") 
+                if menu_open and menu.rect.collidepoint(mx, my):
+                    action = menu.handle_click((mx, my), pet_path)
+                    
+                    if action == "Ask Pet": 
+                        print("Control Menu Closed")
+                        close_control_menu()
+                        print("Prompt Menu Open")
+                        open_prompt_menu()
+                        continue
+                    
+                elif menu_open:
+                    print("Control Menu Closed")
                     close_control_menu()
                     continue
     
@@ -119,6 +150,9 @@ while running:
     
     if menu_open and menu:
         menu.draw(screen)
+        
+    if prompt_menu_open and prompt_menu:
+        prompt_menu.draw(screen)
     
     pygame.display.flip()
     clock.tick(30)

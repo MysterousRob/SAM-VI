@@ -14,8 +14,11 @@ class Pet(pygame.sprite.Sprite):
         # === Basic setup ===
         self.pet_folder = os.path.dirname(image_path)
         self.personality_path = os.path.join(self.pet_folder, "personality.json")
-        self.personality = Personality(self.personality_path)
-
+        
+        base_dir = os.path.abspath(os.path.join(self.pet_folder, '..', '..'))
+        config_path = os.path.join(base_dir, "config.json")
+        
+        self.personality = Personality(self.personality_path, config_path=config_path)
         # === Animation frames ===
         self.frames = self.load_gif_frames(image_path)
         self.current_frame = 0
