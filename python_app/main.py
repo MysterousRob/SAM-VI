@@ -99,8 +99,6 @@ while running:
                 open_control_menu()
             elif event.button == 1 and menu_open:
                 print("Left click detected")
-                # FIX: Correct the redundant function call
-                # mx, my = pygame.mouse.get_pos().get_pos()
                 mx, my = pygame.mouse.get_pos()
                 
                 if not menu.rect.collidepoint(mx, my):

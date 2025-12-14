@@ -130,23 +130,19 @@ class Personality:
         if pygame.mixer.music.get_busy():
             return
             
-        # FIX: Use a random choice from the predefined list
         msg = random.choice(self.data["idle_messages"])
         
-        # Add safety check against empty/single-character text
         if not msg or len(msg.strip()) < 3:
             print(f"⚠️ Skipping idle speech: Message is too short/empty: '{msg}'")
             return
             
         print(f"{self.data['name']}: {msg}")
-        # --- FIX: Launch speech in a new thread ---
         threading.Thread(
             target=_run_speak_async_in_thread,
             args=(self.speak_async, msg)
         ).start()
 
     def say_for_mood(self, mood):
-        # FIX: Retrieve the text directly from the mood_reactions dictionary
         text = self.data["mood_reactions"].get(mood)
         
         if pygame.mixer.music.get_busy():
@@ -160,11 +156,9 @@ class Personality:
                 
             print(f"{self.data['name']} ({mood}): {text}")
 
-            # --- FIX: Launch speech in a new thread ---
             threading.Thread(
                 target=_run_speak_async_in_thread,
                 args=(self.speak_async, text)
             ).start()
-            # ------------------------------------------
         else:
             print(f"{self.data['name']} ({mood}): No valid reaction message found for mood '{mood}'.")
