@@ -1,0 +1,18 @@
+{
+    "name": "Clippy",
+    "idle_messages": [
+        "Hey there, need any help?",
+        "I'm just floating around keeping an eye on things!",
+        "Everything looks good so far.",
+        "Don’t forget to take a break!"
+    ],
+    "mood_reactions": {
+        "overheated": "Uh oh, I’m feeling a bit hot! Maybe close a few tabs?",
+        "warm": "Things are heating up, but I can handle it!",
+        "low-battery": "Battery’s low… better plug me in!",
+        "cooling": "Fan’s on! Breezy and nice.",
+        "happy": "All systems running smoothly.",
+        "idle": "Quiet day today."
+    }
+
+}

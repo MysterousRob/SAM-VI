@@ -1,0 +1,11 @@
+{
+    "last_pet": "assets\\pets\\Clippy\\clippy2025_1.0.gif",
+
+    "current_theme": "dark",
+    "themes": {
+        "dark": "assets/pets/Clippy/themes/Dark",
+        "light": "assets/pets/Clippy/themes/Light"
+    }
+}
+
+
