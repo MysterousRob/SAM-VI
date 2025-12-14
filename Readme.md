@@ -22,6 +22,10 @@ You must have the following software installed on your system to **build** and *
 Follow these steps to set up the environment and build the necessary components.
 
 ### 1. Clone the Repository
+``` bash 
+git clone https://github.com/MysterousRob/SAM-VI.git
+```
+
 ```bash 
 cd SAM-CPU-SIM/CPU_PET_SIM/
 ```
