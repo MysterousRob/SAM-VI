@@ -1,16 +1,17 @@
 import asyncio
 import time
-from edge_tts.exceptions import NoAudioReceived
 import pygame
 import os
 import uuid
 import threading
-import tempfile
+#import tempfile
 import shutil
 import atexit
 import random
 import json
 
+import edge_tts
+from edge_tts.exceptions import NoAudioReceived
 
 
 try:
@@ -109,8 +110,8 @@ class Personality:
         self.data = self._load_data(personality_path)
         
         # pick a deep voice from available ones (change it later)
-        self.voice = "en-US-GuyNeural" 
-        self.rate = "-20%"              
+        self.voice = "en-US-ChristopherNeural" 
+        self.rate = "+0%"              
         self.volume = "+0%"
         self.name = self.data.get("name", "Pet")
         
@@ -123,25 +124,37 @@ class Personality:
             
         #Store it 
         self._last_voice_file = None
+        
+        #holds the text to show in the bubble and for how long to show that bubble for 0 for forever
+        self.current_text = None
+        self.display_timer = 0
 
 
-
+    # ============================================================
+    #   Testing the bubble (Not important just here for testng)
+    # ============================================================
+    def text_bubble(self, message="I am Working"):
+        """Manually forcingt he text into the bubble"""
+        self.current_text = message
+        self.display_timer = time.time() + 5
+        print(f"DEBUG: bubble text set to {message}")
+    
     # =========================
-    #   LOAD PERSONALITY DATA
+    #   LOAD personality DATA
     # =========================
     def _load_data(self, path: str): 
         if not os.path.exists(path):
-            print("⚠️ Personality file missing:", path)
+            print("⚠️ personality file missing:", path)
             return {"name": "Unknown", "idle_messages": [], "mood_reactions": {}}
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    
+            
     # ===============
     #   TTS system
     # ===============
     async def speak_async(self, text):
         """Generate speech to a unique file, then play it safely."""
-        # use unique file each time to avoid permission issues
+        # use unique file each time to avoid perission issues
         out_path = os.path.join(TEMP_DIR, f"temp_SAM_voice_{uuid.uuid4().hex}.mp3")
 
         communicator = edge_tts.Communicate(
@@ -186,7 +199,18 @@ class Personality:
             except Exception as e:
                 print(f"[TTS UNKNOWN ERROR]: Connection ERROR, TTS wont work (WOMP WOMP): {e}")
                 break
-    
+            
+            
+    # ===========================
+    #   AI Prompt Entry Point
+    # ===========================      
+    def ask_ai(self, user_prompt):
+        """Called by main.py when the quesiton is submitted inteh prompt menu"""
+        context = {"mood": "curious", "pet_name": self.name}
+        fallback = "Im having trouble thinking of a good response right now"
+        
+        self._start_ai_and_speach_thread(user_prompt, context, fallback)
+        
     def _start_ai_and_speach_thread(self, prompt: str, context: dict, fallback_text: str):
         """Runs AI and call the TTS in sep thread to avoid freezing the main loop"""
         def worker():
@@ -195,12 +219,21 @@ class Personality:
                 try:
                     ai_msg = self.brain.ask(prompt, context)
                     print(f"AI Response: {self.name}: {ai_msg}")
+                    
+                    self.current_text = ai_msg
+                    #just show it for 7 secconds
+                    self.display_timer = time.time() + 7
+                    
                     msg_to_speak = ai_msg
                 except Exception as e:
                     print(f"AI Worker failed: {e}. Falling back to static text.")
                     msg_to_speak = fallback_text
+                    self.current_text = fallback_text
+                    self.display_timer = time.time() + 5
             else:
                 msg_to_speak = fallback_text
+                self.current_text = fallback_text
+                self.display_timer = time.time() + 5
             
             self._run_speech_sync(msg_to_speak)
         thread = threading.Thread(target=worker, daemon=True)
@@ -228,7 +261,7 @@ class Personality:
         fallback_text = text_from_json
         
         prompt = f"React to the system baing in a '{mood}' state. Keep it brief and in character"
-        context = {"mood" : mood, "per_name" : self.name}
+        context = {"mood" : mood, "pet_name" : self.name}
         
         self._start_ai_and_speach_thread(prompt, context, fallback_text)
         

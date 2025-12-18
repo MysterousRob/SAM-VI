@@ -1,15 +1,54 @@
+#all the imports
+
+
+#basic imports
 import os 
 import pygame
 import json
 import time
 import psutil
+import time
+import sys
 
+#file imports
 from control_menu import ControlMenu
 from overlay_utils import make_window_overlay
 from pet import Pet
 from rust_core import CPU
 from prompt_menu import PromptMenu
 
+
+def draw_speech_bubble(screen, text, pos):
+    font = pygame.font.SysFont("Arial", 16)
+    max_width = 250
+    
+    #some simple word wrap logic
+    words = text.split(' ')
+    lines = []
+    current_line = " "
+    for word in words:
+        test_line = current_line + word + " "
+        if font.size(test_line)[0] < max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = word + ""
+    lines.append(current_line)
+    
+    #calculating the bubble size
+    line_height = font.get_linesize()
+    bubble_height = len(lines) * line_height + 20
+    bubble_width = max([font.size(l)[0] for l in lines]) + 20
+    
+    #Draw Bubble Background
+    bubble_rect = pygame.Rect(pos[0] - (bubble_width // 2), pos[1] - bubble_height - 20, bubble_width, bubble_height)
+    pygame.draw.rect(screen, (255, 255, 220), bubble_rect, border_radius=10)
+    pygame.draw.rect(screen, (0, 0, 0), bubble_rect, 2, border_radius=10)
+    
+    # Draw the Text
+    for i, line in enumerate(lines):
+        txt_surf = font.render(line.strip(), True, (0, 0, 0))
+        screen.blit(txt_surf, (bubble_rect.x + 10, bubble_rect.y + 10 + (i * line_height)))
 
 pygame.init()
 pygame.mixer.init()
@@ -148,6 +187,14 @@ while running:
     screen.fill((25, 25, 30))
     pet.draw(screen)
     
+    if pet.personality.current_text and time.time() < pet.personality.display_timer:
+        #Position it above th pet
+        bubble_x = pet.rect.x + (pet.rect.width // 2)
+        bubble_y = pet.rect.y
+        draw_speech_bubble(screen, pet.personality.current_text, (bubble_x, bubble_y))
+    elif pet.personality.current_text and time.time() >= pet.personality.display_timer:
+        pet.personality.current_text = None
+    
     if menu_open and menu:
         menu.draw(screen)
         
@@ -156,6 +203,6 @@ while running:
     
     pygame.display.flip()
     clock.tick(30)
-    time.sleep(0.05)
+    #time.sleep(0.05)
 
 pygame.quit()
