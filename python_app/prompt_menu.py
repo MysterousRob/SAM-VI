@@ -14,7 +14,16 @@ class PromptMenu:
         #geometry paramaters
         self.width, self.height = 400, 150
         self.rect = pygame.Rect(x, y, self.width, self.height)
+        
+        self.input_rect = pygame.Rect(x + 20, y + 60, 360, 40)
+        
         self.font = DEFAULT_FONT
+        
+        #State variables
+        self.prompt_text = ""
+        self.max_length = 35
+        self.is_active = True
+        
         
         #entry points
         self.color_interactive = (150, 150, 150)
@@ -32,8 +41,10 @@ class PromptMenu:
                 sent_prompt = self.prompt_text.strip()
                 if sent_prompt:
                     print(f"Prompt Sent: {sent_prompt}")
-                    self.prompt_text = ""
+                    ##commenting out bc main.py destroys the menu obj immediately
+                    #self.prompt_text = ""
                     return {"action": "send", "prompt": sent_prompt}
+                
             elif event.key == pygame.K_BACKSPACE:
                 self.prompt_text = self.prompt_text[:-1]
             
@@ -43,7 +54,7 @@ class PromptMenu:
             else:
                 if len(self.prompt_text) < self.max_length:
                     char = event.unicode
-                    if char.isprintable():
+                    if char.isprintable() and char != "":
                         self.prompt_text += char
         
         return None
@@ -58,7 +69,6 @@ class PromptMenu:
         screen.blit(title_surf, (self.rect.x + 20, self.rect.y + 20))
         
         display_text = self.prompt_text
-        
         if (pygame.time.get_tics() // 500) % 2 == 0:
             display_text += "|"
         

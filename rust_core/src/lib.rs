@@ -1,10 +1,13 @@
 use pyo3::prelude::*;
-use rand::Rng;
-use sysinfo::{System, SystemExt, CpuExt};
+use sysinfo::{System, Components, Disks};
+//use nvml_wrapper::Nvml;
+//use nvml_wrapper::enum_wrappers::device::TemperatureSensor
 
 #[pyclass]
 pub struct CPU {
     system: System,
+    components: Components,
+    disks: Disks, 
 }
 
 #[pymethods]
@@ -13,61 +16,66 @@ impl CPU {
     fn new() -> Self {
         let mut sys = System::new_all();
         sys.refresh_all();
-        CPU { system: sys }
+        
+        let components = Components::new_with_refreshed_list();
+        let disks = Disks::new_with_refreshed_list();
+        
+        CPU { 
+            system: sys,
+            components,
+            disks,
+        }
     }
 
-    fn execute(&mut self, opcode: &str, r1: usize, r2: usize) {
-        match opcode {
-            "ADD" => self.registers[r1] += self.registers[r2],
-            "SUB" => self.registers[r1] -= self.registers[r2],
-            "MUL" => self.registers[r1] *= self.registers[r2],
-            "DIV" => if self.registers[r2] != 0 { self.registers[r1] /= self.registers[r2]; },
-            _ => println!("Unknown instruction: {}", opcode),
-        }
-        self.pc += 1;
-
+    fn refresh(&mut self) {
         self.system.refresh_all();
+        self.components.refresh();
+        self.disks.refresh(); 
     }
 
     fn get_cpu_usage(&mut self) -> f32 {
-        self.system.refresh_cpu();
-        let mut total = 0.0;
-        for cpu in self.system.cpus() {
-            total += cpu.cpu_usage();
-        }
-        total / self.system.cpus().len() as f32
+        self.system.refresh_cpu_usage(); 
+        let cpus = self.system.cpus();
+        if cpus.is_empty() { return 0.0; }
+        cpus.iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / cpus.len() as f32
     }
 
     fn get_memory_usage(&mut self) -> f32 {
         self.system.refresh_memory();
         let total = self.system.total_memory() as f32;
         let used = self.system.used_memory() as f32;
+        if total == 0.0 { return 0.0; }
         (used / total) * 100.0
     }
 
-    fn get_gpu_usage(&self) -> f32 {
-        let mut rng = rand::thread_rng();
-        rng.gen_range(10.0..95.0)
+    fn get_temperature(&mut self) -> f32 {
+        self.components.refresh();
+        
+        self.components
+            .iter()
+            .find(|c| {
+                let label = c.label().to_uppercase();
+                label.contains("CPU") || label.contains("PACKAGE")
+            })
+            .map(|c| c.temperature()) 
+            .unwrap_or(45.0) 
     }
 
-    fn get_gpu_temp(&self) -> f32 {
-        let mut rng = rand::thread_rng();
-        rng.gen_range(40.0..80.0)
-    }
-
-    fn get_temperature(&self) -> f32 {
-        let mut rng = rand::thread_rng();
-        rng.gen_range(50.0..90.0)
-    }
-
-    fn get_power_usage(&self) -> f32 {
-        let mut rng = rand::thread_rng();
-        rng.gen_range(30.0..100.0)
+    fn get_disk_usage(&mut self) -> f32 {
+        self.disks.refresh(); 
+        let disk = self.disks.iter().next(); 
+        if let Some(d) = disk {
+            let total = d.total_space() as f32;
+            let available = d.available_space() as f32;
+            if total == 0.0 { return 0.0; }
+            return ((total - available) / total) * 100.0;
+        }
+        0.0
     }
 }
 
 #[pymodule]
-fn rust_core(_py: Python, m: &PyModule) -> PyResult<()> {
+fn rust_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CPU>()?;
     Ok(())
 }

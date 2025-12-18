@@ -204,11 +204,15 @@ class Personality:
     # ===========================
     #   AI Prompt Entry Point
     # ===========================      
-    def ask_ai(self, user_prompt):
+    def ask_ai(self, user_prompt, context=None):
         """Called by main.py when the quesiton is submitted inteh prompt menu"""
-        context = {"mood": "curious", "pet_name": self.name}
-        fallback = "Im having trouble thinking of a good response right now"
-        
+        if context is None:
+            context = {"mood": "curious", "pet_name": self.name}
+        else:
+            context["pet_name"] = self.name
+            context["mood"] = context.get("mood", "aware")
+            
+        fallback = "My circuts are a bit fried come back later"
         self._start_ai_and_speach_thread(user_prompt, context, fallback)
         
     def _start_ai_and_speach_thread(self, prompt: str, context: dict, fallback_text: str):

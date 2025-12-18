@@ -8,8 +8,8 @@
     },
 
     "ai_config": {
-        "enabled": false,
-        "backend": "openai"
+        "enabled": true,
+        "backend": "local"
     }
 }
 
