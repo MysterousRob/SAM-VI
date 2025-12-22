@@ -3,6 +3,7 @@ import pygame
 import json
 import time
 import sys
+import shutil  
 
 # File imports
 from control_menu import ControlMenu
@@ -38,6 +39,17 @@ def draw_speech_bubble(screen, text, pos):
         txt_surf = font.render(line.strip(), True, (0, 0, 0))
         screen.blit(txt_surf, (bubble_rect.x + 10, bubble_rect.y + 10 + (i * line_height)))
 
+# --- Cleanup Logic ---
+def cleanup_temp_files():
+    """Deletes the voices folder upon exit"""
+    folder = 'voices'
+    if os.path.exists(folder):
+        try:
+            shutil.rmtree(folder)
+            print(f"🧹 Cleaned up {folder} folder.")
+        except Exception as e:
+            print(f"⚠️ Could not delete voices folder: {e}")
+
 pygame.init()
 pygame.mixer.init()
 
@@ -50,21 +62,17 @@ def load_config():
 
 config = load_config()
 
-# Set up screen
 screen = pygame.display.set_mode((1920, 1080), pygame.NOFRAME)
 pygame.display.set_caption("Clippy Overlay")
 make_window_overlay("Clippy Overlay")
 
 clock = pygame.time.Clock()
 
-# Initialize Pet
 pet_path = config.get("last_pet", "assets/pets/Clippy/clippy2025_1.0.gif")
 pet = Pet(pet_path, (1920, 1080))
 
-# Initialize Rust Core
 sim_cpu = CPU()
 
-# Menu state
 menu = None
 menu_open = False
 prompt_menu = None 
@@ -81,7 +89,7 @@ def open_control_menu():
 def close_control_menu():
     global menu, menu_open
     if menu_open:
-        if menu: menu.close()
+        if menu: menu.close() 
         menu = None
         menu_open = False
         
@@ -102,9 +110,8 @@ def close_prompt_menu():
 
 running = True
 while running:
-    #refreshed the data
-    #sim_cpu.refresh()
-    #then grabs the statistics from backend
+    # Refreshing stats (uncommented for real-time updates)
+    sim_cpu.refresh()
     stats = {
         "cpu_usage": sim_cpu.get_cpu_usage(),
         "gpu_usage": sim_cpu.get_gpu_usage(),
@@ -124,7 +131,6 @@ while running:
             result = prompt_menu.handle_event(event)
             if result:
                 if result.get("action") == "send":
-                    # Pass context to the AI ask
                     pet.personality.ask_ai(result['prompt'], context={"stats": stats})
                     close_prompt_menu()
                 elif result.get("action") == "close":
@@ -139,13 +145,19 @@ while running:
                 else: open_control_menu()
                 
             elif event.button == 1: # Left Click
-                if menu_open and menu.rect.collidepoint(mx, my):
-                    action = menu.handle_click((mx, my), pet_path)
-                    if action == "Ask Pet": 
+                if menu_open and menu:
+                    is_on_menu = menu.rect.collidepoint(mx, my)
+                    is_on_overlay = False
+                    if menu.active_overlay and menu.overlay_rect:
+                        is_on_overlay = menu.overlay_rect.collidepoint(mx, my)
+
+                    if is_on_menu or is_on_overlay:
+                        action = menu.handle_click((mx, my), pet_path)
+                        if action == "Ask Me": 
+                            close_control_menu()
+                            open_prompt_menu()
+                    else:
                         close_control_menu()
-                        open_prompt_menu()
-                elif menu_open:
-                    close_control_menu()
 
     # Drawing
     screen.fill((0, 0, 0, 0)) 
@@ -167,4 +179,7 @@ while running:
     pygame.display.flip()
     clock.tick(30)
 
+#this is the fiinaal exit sequence
 pygame.quit()
+cleanup_temp_files() 
+sys.exit()
