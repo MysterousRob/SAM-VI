@@ -62,19 +62,18 @@ class PromptMenu:
     def draw(self, screen):
         """draws the prompt window"""
         pygame.draw.rect(screen, self.bg_color, self.rect, border_radius=10)
-        
         pygame.draw.rect(screen, self.color_active, self.input_rect, 2, border_radius=5)
         
-        title_surf = self.font.render("Ask Clippy(ESC to close):", True, self.text_color)
+        title_surf = self.font.render("Ask Clippy (ESC to close):", True, self.text_color)
         screen.blit(title_surf, (self.rect.x + 20, self.rect.y + 20))
         
         display_text = self.prompt_text
-        if (pygame.time.get_tics() // 500) % 2 == 0:
+        if (pygame.time.get_ticks() // 500) % 2 == 0:
             display_text += "|"
         
         txt_surface = self.font.render(display_text, True, self.text_color)
         
-        if txt_surface.get() > self.input_rect.width - 10:
+        if txt_surface.get_width() > self.input_rect.width - 10:
             display_text = display_text[-(self.max_length):]
             txt_surface = self.font.render(display_text, True, self.text_color)
         

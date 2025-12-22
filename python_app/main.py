@@ -3,7 +3,13 @@ import pygame
 import json
 import time
 import sys
-import shutil  
+import shutil 
+import threading
+
+#ai imports 
+from ai_core.brain import LocalBrain
+
+
 
 # File imports
 from control_menu import ControlMenu
@@ -78,6 +84,10 @@ menu_open = False
 prompt_menu = None 
 prompt_menu_open = False 
 
+
+ai_brain = LocalBrain()
+
+
 def open_control_menu():
     global menu, menu_open
     if not menu_open:
@@ -131,8 +141,23 @@ while running:
             result = prompt_menu.handle_event(event)
             if result:
                 if result.get("action") == "send":
-                    pet.personality.ask_ai(result['prompt'], context={"stats": stats})
+                    user_text = result['prompt']
+                    
+                    # -- ai threding start --
+                    pet.personality.current_text = "Thinking... "
+                    pet.personality.display_timer = time.time() + 30
+                    
+                    def ai_background_task(prompt, context):
+                        #running outside the main looop
+                        response = ai_brain.ask(prompt, context)
+                        # updateds the pet back  on the main loop (Yes pygame does run this)
+                        pet.personality.current_text = response
+                        pet.personality.display_timer = time.time() + 8
+                    #start the ai int he background
+                    threading.Thread(target=ai_background_task, args=(user_text, {"stats": stats}), daemon=True).start()
+                    
                     close_prompt_menu()
+                        
                 elif result.get("action") == "close":
                     close_prompt_menu() 
             continue
