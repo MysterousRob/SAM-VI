@@ -24,6 +24,12 @@ class ControlMenu:
         self.overlay_rect = None
         self.overlay_type = None
     
+    
+    def close(self):
+        """stops any crashes given  by main.py by the method its looking for"""
+        self.active_overlay = False
+        self.overlay_type = None
+        
     def create_buttons(self):
         # We've renamed these to be "Dashboards" essentially
         labels = ["Themes", "CPU Stats", "GPU Stats", "Memory", "Ask Me"]
