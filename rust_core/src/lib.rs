@@ -1,13 +1,14 @@
 use pyo3::prelude::*;
 use sysinfo::{System, Components, Disks};
-//use nvml_wrapper::Nvml;
-//use nvml_wrapper::enum_wrappers::device::TemperatureSensor
+use nvml_wrapper::Nvml;
+use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 
 #[pyclass]
 pub struct CPU {
     system: System,
     components: Components,
     disks: Disks, 
+    nvml: Option<Nvml>,
 }
 
 #[pymethods]
@@ -19,11 +20,14 @@ impl CPU {
         
         let components = Components::new_with_refreshed_list();
         let disks = Disks::new_with_refreshed_list();
+
+        let nvml = Nvml::init().ok();
         
         CPU { 
             system: sys,
             components,
             disks,
+            nvml,
         }
     }
 
@@ -33,6 +37,42 @@ impl CPU {
         self.disks.refresh(); 
     }
 
+    // --- GPU Methods ---
+    pub fn get_gpu_usage(&self) -> f32 {
+        if let Some(nvml) = &self.nvml {
+            if let Ok(device) = nvml.device_by_index(0) {
+                if let Ok(utilization) = device.utilization_rates() {
+                    return utilization.gpu as f32;
+                }
+            }
+        }
+        0.0
+    }
+
+    pub fn get_gpu_temp(&self) -> f32 {
+        if let Some(nvml) = &self.nvml {
+            if let Ok(device) = nvml.device_by_index(0) {
+                if let Ok(temp) = device.temperature(TemperatureSensor::Gpu) {
+                    return temp as f32;
+                }
+            }
+        }
+        0.0
+    }
+
+    pub fn get_gpu_power(&self) -> f32 {
+        if let Some(nvml) = &self.nvml {
+            if let Ok(device) = nvml.device_by_index(0) {
+                // Returns milliwatts, so we divide by 1000.0 for Watts
+                if let Ok(power) = device.power_usage() {
+                    return (power as f32) / 1000.0;
+                }
+            }
+        }
+        0.0
+    }
+
+    // --- CPU & System Methods ---
     fn get_cpu_usage(&mut self) -> f32 {
         self.system.refresh_cpu_usage(); 
         let cpus = self.system.cpus();
@@ -50,7 +90,6 @@ impl CPU {
 
     fn get_temperature(&mut self) -> f32 {
         self.components.refresh();
-        
         self.components
             .iter()
             .find(|c| {
