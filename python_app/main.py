@@ -51,8 +51,11 @@ def cleanup_temp_files():
     folder = 'voices'
     if os.path.exists(folder):
         try:
+            pygame.mixer.stop()
+            pygame.mixer.quit()
+            time.sleep(0.5)
             shutil.rmtree(folder)
-            print(f"🧹 Cleaned up {folder} folder.")
+            print(f"Cleaned up {folder} folder.")
         except Exception as e:
             print(f"⚠️ Could not delete voices folder: {e}")
 
@@ -148,15 +151,22 @@ while running:
                     pet.personality.display_timer = time.time() + 30
                     
                     def ai_background_task(prompt, context):
-                        #running outside the main looop
-                        response = ai_brain.ask(prompt, context)
-                        # updateds the pet back  on the main loop (Yes pygame does run this)
-                        pet.personality.current_text = response
-                        pet.personality.display_timer = time.time() + 8
-                    #start the ai int he background
-                    threading.Thread(target=ai_background_task, args=(user_text, {"stats": stats}), daemon=True).start()
-                    
-                    close_prompt_menu()
+                        try: 
+                            response = ai_brain.ask(prompt, context)
+                            
+                            if response and len(response.strip()) > 0:
+                                print(f"AI Response Recieved: {response}")
+                                pet.personality.current_text = response
+                                pet.personality.display_timer = time.time() + 10
+                                
+                                #trigger TTS only if response is valid
+                                #pet.speak(response)
+                            else:
+                                pet.personality.current_text = "Im drawing a blank..."
+                                pet.personality.display_timer = time.time() + 5
+                        except Exception as e:
+                            print(f"Thread Error: {e}")
+                            pet.personality.current_text = "My Brain just glitched!"
                         
                 elif result.get("action") == "close":
                     close_prompt_menu() 
