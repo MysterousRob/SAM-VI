@@ -102,17 +102,19 @@ def close_prompt_menu():
 
 running = True
 while running:
-    sim_cpu.refresh()
+    #refreshed the data
+    #sim_cpu.refresh()
+    #then grabs the statistics from backend
     stats = {
         "cpu_usage": sim_cpu.get_cpu_usage(),
-        "memory_usage": sim_cpu.get_memory_usage(),
-        "temperature": sim_cpu.get_temperature(),
-        "disk_usage": sim_cpu.get_disk_usage()
+        "gpu_usage": sim_cpu.get_gpu_usage(),
+        "gpu_temp": sim_cpu.get_gpu_temp(),
+        "cpu_temp": sim_cpu.get_temperature(), 
+        "mem_usage": sim_cpu.get_memory_usage()
     }
-
-    pet.personality.last_stats = stats
-    
-    pet.update(stats["temperature"], stats["cpu_usage"])
+    current_mood = pet.personality.update_mood_from_stats(stats)
+    pet.update_from_mood(current_mood)
+    pet.update()
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:

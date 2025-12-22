@@ -128,6 +128,9 @@ class Personality:
         #holds the text to show in the bubble and for how long to show that bubble for 0 for forever
         self.current_text = None
         self.display_timer = 0
+        
+        #gotta prevent him from screeming every 1 seccond
+        self.last_mood_shout = 0
 
 
     # ============================================================
@@ -149,6 +152,25 @@ class Personality:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
             
+            
+    def update_mood_from_stats(self, stats):
+        cpu = stats.get("cpu_usage", 0)
+        gpu = stats.get("gpu_usage", 0)
+        temp = stats.get("gpu_temp", 0)
+        mem = stats.get("mem_usage", 0) 
+        
+        if temp > 85:
+            return "MELTING"
+        elif mem > 90:             
+            return "STUFFED"
+        elif gpu > 90:
+            return "GAMING_HARD"
+        elif cpu < 5:
+            return "BORED"
+        else:
+            return "CHILLING"
+    
+    
     # ===============
     #   TTS system
     # ===============

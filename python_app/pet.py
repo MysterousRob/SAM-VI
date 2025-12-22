@@ -99,7 +99,29 @@ class Pet(pygame.sprite.Sprite):
     # ===============================
     # 🧩 MAIN UPDATE LOOP
     # ===============================
-    def update(self, cpu_temp, cpu_power, battery=None, fan=None, gpu_stats=None, throttled=False):
+    def update_from_mood(self, mood):
+        """Sets the mood and color tinting."""
+        self.mood = mood
+        
+        mood_colors = {
+            "MELTING": (255, 50, 50),
+            "GAMING_HARD": (200, 0, 255),
+            "PANICKED": (255, 140, 0),
+            "STUFFED": (100, 255, 100),
+            "BORED": (150, 150, 255),
+            "CHILLING": (255, 255, 255),
+        }
+        
+        self.color = mood_colors.get(self.mood, (255, 255, 255))
+
+        if self.mood != self.last_mood:
+            if hasattr(self, "personality"):
+                self.personality.say_for_mood(self.mood)
+                self.play_mood_sound(self.mood)
+            self.last_mood = self.mood
+
+    def update(self):
+        """Handles movement and animation frames."""
         # --- Movement ---
         self.rect.x += self.vx
         self.rect.y += self.vy
@@ -115,33 +137,10 @@ class Pet(pygame.sprite.Sprite):
             self.current_frame = (self.current_frame + 1) % len(self.frames)
             self.image = self.frames[self.current_frame]
 
-        # --- Mood logic ---
-        if cpu_temp > 80:
-            self.mood = "overheated"
-            self.color = (255, 50, 50)
-        elif cpu_temp > 65:
-            self.mood = "warm"
-            self.color = (255, 140, 0)
-        elif battery and not battery["plugged"] and battery["percent"] < 25:
-            self.mood = "low-battery"
-            self.color = (150, 150, 255)
-        elif fan and fan > 2500:
-            self.mood = "cooling"
-            self.color = (100, 200, 255)
-        else:
-            self.mood = "happy"
-            self.color = (255, 255, 255)
-
-        # --- React to mood changes ---
-        if self.mood != self.last_mood:
-            if hasattr(self, "personality"):
-                self.personality.say_for_mood(self.mood)
-            self.last_mood = self.mood
-
         # --- Occasional idle chatter ---
         current_time = time.time()
         if current_time - self.last_speech_time > self.speech_cooldown:
-            if random.randint(0, 20) == 1:
+            if random.randint(0, 100) == 1:
                 self.personality.say_random_idle()
                 self.last_speech_time = current_time
 
